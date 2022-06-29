@@ -1,8 +1,5 @@
-//! # GPIO 'Blinky' Example
-//!
-//! This application demonstrates how to control a GPIO pin on the RP2040.
-//!
-//! It may need to be adapted to your particular board layout and/or pin assignment.
+//! This application uses a RP2040 (Pico) and an ultrasonic transducer to demonstrate
+//! a level detector with hysteresis (Schmitt trigger).
 //!
 //! See the `Cargo.toml` file for Copyright and licence details.
 
@@ -24,6 +21,7 @@ use rp2040_hal as hal;
 use hal::pac;
 
 // Some traits we need
+use embedded_hal::digital::v2::InputPin;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_time::fixed_point::FixedPoint;
 use rp2040_hal::clocks::Clock;
@@ -80,14 +78,45 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
-    // Configure GPIO25 as an output
+    let timer = hal::Timer::new(pac.TIMER, &mut pac.RESETS);
+
+    // Configure GPIO25 as LED output
     let mut led_pin = pins.gpio25.into_push_pull_output();
+    // Configure GPIO3 as trigger output
+    let mut trigger_pin = pins.gpio8.into_push_pull_output();
+    // Configure GPIO2 as echo input
+    let echo_pin = pins.gpio9.into_pull_down_input();
+    
     loop {
-        led_pin.set_high().unwrap();
-        // TODO: Replace with proper 1s delays once we have clocks working
-        delay.delay_ms(500);
-        led_pin.set_low().unwrap();
-        delay.delay_ms(500);
+        // Send ultrasonic pulse
+        trigger_pin.set_low().unwrap();
+        delay.delay_us(2);
+        trigger_pin.set_high().unwrap();
+        delay.delay_us(5);
+        trigger_pin.set_low().unwrap();
+
+        // Mark the start time (µs).
+        let t1 = timer.get_counter();
+
+        // Wait until the echo pulse is received.
+        while echo_pin.is_low().unwrap() {
+        }
+        while echo_pin.is_high().unwrap() {
+        }
+
+        // Mark the echo return time (µs).
+        let t2 = timer.get_counter();
+
+        // Calculate the pulse distance using 343m/s as the speed of sound.
+        // (Divide by 2 as the echo travels twice the distance.)
+        let distance = (t2 - t1) as f64 * 0.000343 / 2.0;
+        
+        // Depending on the distance do something with the LED.
+        if distance > 0.8 {
+            led_pin.set_high().unwrap();
+        } else if distance < 0.5 {
+            led_pin.set_low().unwrap();
+        }
     }
 }
 
