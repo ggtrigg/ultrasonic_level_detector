@@ -86,8 +86,17 @@ fn main() -> ! {
     let mut trigger_pin = pins.gpio8.into_push_pull_output();
     // Configure GPIO2 as echo input
     let echo_pin = pins.gpio9.into_pull_down_input();
-    
+
+    let mut t1: u64;
+    let mut t2: u64;
+    let mut distance: f64;
+    let mut first_time: bool = true;
+
     loop {
+        if first_time {
+            delay.delay_ms(1000);   // Initial delay to let transducer settle.
+            first_time = false;
+        }
         // Send ultrasonic pulse
         trigger_pin.set_low().unwrap();
         delay.delay_us(2);
@@ -96,7 +105,7 @@ fn main() -> ! {
         trigger_pin.set_low().unwrap();
 
         // Mark the start time (µs).
-        let t1 = timer.get_counter();
+        t1 = timer.get_counter();
 
         // Wait until the echo pulse is received.
         while echo_pin.is_low().unwrap() {
@@ -105,11 +114,11 @@ fn main() -> ! {
         }
 
         // Mark the echo return time (µs).
-        let t2 = timer.get_counter();
+        t2 = timer.get_counter();
 
         // Calculate the pulse distance using 343m/s as the speed of sound.
         // (Divide by 2 as the echo travels twice the distance.)
-        let distance = (t2 - t1) as f64 * 0.000343 / 2.0;
+        distance = (t2 - t1) as f64 * 0.000343 / 2.0;
         
         // Depending on the distance do something with the LED.
         if distance > 0.8 {
